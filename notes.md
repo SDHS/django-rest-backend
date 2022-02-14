@@ -5,6 +5,7 @@
 ### Creating a Vagrantfile
 
 `vagrant init <type-of-os>`
+
 In our case, `<type-of-os>` is `ubuntu/bionic64`. So, we'll run the following command:
 
 `vagrant init ubuntu/bionic64`
@@ -12,11 +13,14 @@ In our case, `<type-of-os>` is `ubuntu/bionic64`. So, we'll run the following co
 This command will create a vanilla ubuntu image based on the standard ubuntu. We'll, of course, need to modify this file according to our needs.
 
 First thing is to set the `config.vm.box_version` to a specific version to shield against any breaking changes introduced in the newer versions. In our case, it is set to:
+
 `config.vm.box_version = "~> 20200304.0.0"`
 
 Next, the `config.vm.network` maps a specific port from our local machine to the machine on our server.
 In our case, it is:
+
 `config.vm.network "forwarded_port", guest: 8000, host: 8000`
+
 We'll be running our app on port 8000, and we want to make this port accessible from our host machine.
 `host` machine is the one on which we are running the development server, and the `guest` machine is the development server itself. By default, the ports are not accessible on the guest machine, necessitating the need for the above configuration. Now, we can access the ports by going `localhost:8000`, and it will automatically map the connection to our `guest` machine, the development server.
 
@@ -27,11 +31,13 @@ Next, we have a `provision` block:
 This allows us to run scripts when we first create our server. Let's look at the commands of this script line by line.
 
 `systemctl disable apt-daily.service`
+
 `systemctl disable apt-daily.timer`
 
 Above two lines disable the auto update, which conflicts with the third line (coming up) of the script.
 
 `sudo apt-get update`
+
 `sudo apt-get install -y python3-venv zip`
 
 Third line will update the repository with all of the available packages, so that in the fourth line, we can install `python3-venv` and `zip`. `python3-venv` is a virtual environment package needed to isolate our repository dependencies. `zip` will allow us to create `.zip` files.
