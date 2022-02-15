@@ -433,3 +433,111 @@ Here, we'll type the email and password of the superuser we previously created.
 We'll see three sections in the django admin interface. Each section represents a different app in our project. `AUTH TOKEN` app is automatically added as part of the `django rest framework`. `AUTHENTICATION AND AUTHORIZATION` is part of Django. It comes out of the box and allow us to use the authentication system. Finally, we have the app we created, `profiles_api`. In its section, we can also see the `UserProfile` model that we created. However, Django has automatically named it `user profiles`, by removing the pascal case and pluralizing it.
 
 Clicking on the `user profiles` model, we can see our superuser.
+
+### API Views
+
+The Django Rest Framework offers a couple of helper classes we can use to create our API endpoints. A couple of them are:
+
+1. `APIView`
+2. `ViewSet`
+
+Both classes are slightly different and offer their own benefits. We'll take a look at `APIView`.
+
+`APIView` is the most basic type of view we can use to build our API. It enables us to describe the logic which makes our API endpoint. An `APIView` allows us to define functions that match the standard HTTP methods. (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`). By allowing us to customize the function for each HTTP method on our API URL, `APIView` gives us control over our API logic. This is great for implementing complex logic, e.g., calling other APIs, working with local files etc.
+
+So, when should we use `APIView`? A lot of the times, it depends on preference. As we learn more about the Django Rest Framework. However, following are some situtations where it might be appropriate:
+
+- Need full control over the logic
+- Processing files and rendering a synchronous response
+- Calling other APIs/services
+- Accessing local files/data
+
+### Creating our First APIView
+
+Let's create a simple hello world APIView to understand how it works.
+
+Go to the `views.py` file of the `profiles_api` app. Let's remove all the content of that file that is automatically inserted by Django, and add the following two imports:
+
+```
+from rest_framework.views import APIView
+from rest_framework.response import Response
+```
+
+First line imports the `APIView`. Second imports the `Response`. This `Response` object is expected to return when django rest framework calls our `APIView`.
+
+Let's define our `APIView`:
+
+```
+class HelloApiView(APIView):
+    """Test API View"""
+```
+
+This creates a new class that inherits from `APIView`. It allows us to define the application logic for our endpoints. We will define a URL (our endpoint) and the django rest framework handles it by calling the appropriate function in the view for the HTTP request that is made.
+
+The way `APIView` operates is that it expects a function for the different HTTP requests that can be made to the view. Let's define a function for the HTTP GET request.
+
+```
+def get(self, request, format=None):
+    """Returns a list of APIView features"""
+```
+
+The `request` parameter is passed by the django rest framework and contains details of the request being made to the API. `format` is used to add a format suffix (e.g. `json`, `csv`, etc.) to the end of the endpoint URL. We won't be using formats, but it's still best practice to add the `format` parameter in case we decide to enable formats on our APIs.
+
+```
+an_apiview = [
+    'Uses HTTP methods as functions (get, post, patch, put, delete)',
+    'Is similar to a traditional Django View',
+    'Gives you the most control over your application logic',
+    'Is mapped manually to URLs',
+]
+
+return Response({
+    'message': 'Hello',
+    'an_apiview': an_apiview,
+})
+```
+
+We have created a list that describes all the features of an `APIView` in our `get` function. Then, we return a `Response` object. It expects either a list or a dictionary, because `Response` object returns `json` data. For that, we need either a list or a dictionary.
+
+### Configure View URL
+
+Now that we have our `APIView`, we can wire this view up to a URL in Django. For that, go to the `urls.py` file in the `profiles_project` project folder. This is the entry point for all of the URLs in our app. This file already contains some data. We can see that the url to the `admin/` endpoint has already been added.
+
+We need to create a `urls.py` file in our `profiles_api` app directory. This is where we'll store the URLs for our API. After creating this file, we need to add its entry in the `urlpatterns` list in the `urls.py` file in our `profiles_project` folder. For that, we first need to import `include` from `django.urls`. Since that module has already been imported, we simply need to append `include` at the end of that import, separated by a comma:
+
+```
+from django.contrib import admin
+from django.urls import path, include
+```
+
+`include` is a function that we can use to include URLs from other apps in the root project `urls.py` file.
+
+```
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/', include('<app_name>.urls'))
+]
+```
+
+In our case, the `urlpatterns` list would look like:
+
+```
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/', include('profiles_api.urls'))
+]
+```
+
+Now, when we go to `/api` in the webserver, it will pass in the request to our django app (`profiles_api`), which will look for URL patterns for the first URL which matches the URL that we've entered. Anything after the `/api` in the URL that is provided in the browser is going to be passed to the `urls.py` file of the `profiles_api` app. We need to handle the rest of the URL in the `urls.py` file of `profiles_api` app:
+
+```
+from django.urls import path
+
+from profiles_api import views
+
+urlpatterns = [
+    path('hello-view/', views.HelloApiView.as_view()),
+]
+```
+
+This `urls.py` file is also quite similar to the `urls.py` file of the `profiles_project` directory. Here, we simply define the path, and the view we want to show for that path. In our case, we are going to show `HelloApiView` on `hello-view/` path. `as_view()` is the standard method we call to convert our `APIView` class to a form renderable in the browser. This view is now available on the URL `127.0.0.1:8000/api/hello-view`
