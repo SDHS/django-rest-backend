@@ -300,13 +300,13 @@ def __str__(self):
     return self.email
 ```
 
-First line tells Django to use the previously defined email field instead of the usernames Django uses by default. Second line defines the fields that should be marked required. (Since the `USERNAME_FIELD` (email) is required by default, we don't need to add it to the `REQUIRED_FIELDS` list). We have also added a couple of functions that help Django interact with our custom user model. They are quite self-explanatory. The last method `__self__` returns the string representation of our model. So, whenever some model object is printed, we'll get the email of that model as the result.
+First line tells Django to use the previously defined email field instead of the usernames Django uses by default. Second line defines the fields that should be marked required. (Since the `USERNAME_FIELD` (email) is required by default, we don't need to add it to the `REQUIRED_FIELDS` list). We have also added a couple of functions that help Django interact with our custom user model. They are quite self-explanatory. The last method `__str__` returns the string representation of our model. So, whenever some model object is printed, we'll get the email of that model as the result.
 
 ### Adding our User Model Manager
 
 Now that our `UserProfile` model is created, we'll also create a manager for that model so that Django knows how to interact with it in the CLI.
 
-One command we're going to be using the CLI is called the `create_superuser`. It allows us to create a user that has access to the Django admin page. But, since by default, Django expects a username and password, and our model is based on emails and passwords, we need to be able to tell Django to modify its default behaviour and look for emails instead of usernames. Our `UserProfileManager` will help us with that.
+One command we're going to be using in the CLI is called the `createsuperuser`. It allows us to create a user that has access to the Django admin page. But, since by default, Django expects a username and password, and our model is based on emails and passwords, we need to be able to tell Django to modify its default behaviour and look for emails instead of usernames. Our `UserProfileManager` will help us with that.
 
 `UserProfileManager` will also be defined in the `models.py` file in our `profiles_api` app, but above our `UserProfile` model. Like `UserModel`, it will also inherit from a class called `BaseUserManager`. It can be imported as:
 
@@ -330,7 +330,7 @@ def create_user(self, email, name, password=None):
     user = self.model(email=email, name=name)
     user.set_password(password)
 
-    user.save(user=self._db)
+    user.save(using=self._db)
 
     return user
 ```
@@ -347,7 +347,7 @@ def create_superuser(self, email, name, password):
     superuser.is_superuser = True
     superuser.is_staff = True
 
-    superuser.save(self._db)
+    superuser.save(using=self._db)
 
     return superuser
 ```
@@ -387,3 +387,49 @@ We have done only one step so far, though. Now that our migrations file has been
 This will run all the migrations in our project.
 
 This will create tables in the database corresponding to all of the models in our project and their dependencies.
+
+### Creating a superuser
+
+Django admin is a really useful tool that allows us to create an administrator website for our project through which we can manage our database models. This makes it really easy to inspect the database, and modify the models.
+
+Before we can use the django admin, though, we'll have to create a superuser. superuser is a user with maximum privileges over our database. We'll create a superuser using the Django CLI. In the `/vagrant` directory with virtual environment active, type:
+
+`python manage.py createsuperuser`
+
+This will prompt you to enter your email, name, and password. Once entered, the superuser is created.
+
+### Enabling Django Admin
+
+By default, django admin is already enabled on all new projects. However, we need to register any newly created models with the django admin so that it knows that we want to display that model in the admin interface. To enable the django admin for our `UserProfile` model, go to the `admin.py` file in our `profiles_api` app directory. Import your model into this file by:
+
+`from <app_name> import models`
+
+In our case:
+
+`from profiles_api import models`
+
+After importing the model, register it using:
+
+`admin.site.register(models.<ModelName>`
+
+In our case:
+
+`admin.site.register(models.UserProfile)`
+
+admin is already imported by Django into the `admin.py` file.
+
+### Testing Django Admin
+
+Now that we have enabled the django admin for our project, we can test it by starting the django dev server using: (ensure virtual environment is active and you're in the `/vagrant` directory)
+
+`python manage.py runserver 0.0.0.0:8000`
+
+and going to:
+
+`127.0.0.1:8000/admin`
+
+Here, we'll type the email and password of the superuser we previously created.
+
+We'll see three sections in the django admin interface. Each section represents a different app in our project. `AUTH TOKEN` app is automatically added as part of the `django rest framework`. `AUTHENTICATION AND AUTHORIZATION` is part of Django. It comes out of the box and allow us to use the authentication system. Finally, we have the app we created, `profiles_api`. In its section, we can also see the `UserProfile` model that we created. However, Django has automatically named it `user profiles`, by removing the pascal case and pluralizing it.
+
+Clicking on the `user profiles` model, we can see our superuser.
