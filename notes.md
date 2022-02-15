@@ -541,3 +541,84 @@ urlpatterns = [
 ```
 
 This `urls.py` file is also quite similar to the `urls.py` file of the `profiles_project` directory. Here, we simply define the path, and the view we want to show for that path. In our case, we are going to show `HelloApiView` on `hello-view/` path. `as_view()` is the standard method we call to convert our `APIView` class to a form renderable in the browser. This view is now available on the URL `127.0.0.1:8000/api/hello-view`
+
+### Create a Serializer
+
+Serializer is a feature from the django rest framework
+that allows us to easily convert data inputs into Python objects and vice versa. It's quite similar to a Django form which we define and it has various fields that we want to accept for the input for our api. For example, if we want to add `POST` or `UPDATE` functionality to our hello `APIView` then we need to create a serializer to receive the content that we post to the API.
+
+To create a serializer, go to the `profiles_api` app directory, and create a `serializers.py` file.
+
+```
+from rest_framework import serializers
+
+
+class HelloSerializer(serializers.Serializer):
+    """Serializes a name field for testing our APIView"""
+    name = serializers.CharField(max_length=10)
+```
+
+`name` is the field that we want to accept in our serializer input. `name` is a value that can be passed into the request that will be validated by the serializer.
+
+Serializers also take care of validation rules. So, if we want to accept a certain field of a certain type, serializers will make sure that the content past that API is of the correct type.
+
+### Add POST Method to APIView
+
+In the `views.py` file in `profiles_api` app folder, include thefollowing two imports:
+
+```
+from rest_framework import status
+
+from profiles_api import serializers
+```
+
+First import gives us access to the HTTP codes (200, 404 etc). Second is, of course, our `serializers` file.
+We'll use our `serializers` file to tell our `APIView` what data to expect when making `POST`, `PUT`, and `PATCH` requests. We need to set a serializer in our `HelloApiView` to use the functionality of our serializer.
+
+`serializer_class = serializers.HelloSerializer`
+
+After adding the above line in our `HelloApiView`, we can now create our `post` method:
+
+```
+def post(self, request):
+    """Create a hello message with our name"""
+    serializer = self.serializer_class(data=request.data)
+
+    if serializer.is_valid():
+        name = serializer.validated_data.get('name')
+        message = f'Hello, {name}!'
+        return Response({'message': message})
+    else:
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+```
+
+First, we retrieve the `serializer_class`. It is the standard way of retrieving `serializer_class` defined above when working with serializers in a view.
+
+`data=request.data` assigns the data. When we make a `POST` request to our `APIView`, the data gets passed in as `request.data`. It's part of the `request` object that is passed to our `request` object. We pass this data to our serializer class and store the whole thing in a new local variable `serializer`. Next, we validate the serializer (ensure it is valid as per the specification of the serializer fields). If it is valid, then we're going to retrieve the valid data into the `name` variable (equivalent name to the field of the serializer). We'll construct a message using that field, and simply return our message as a `response`. If the data is not valid, then we'll simply return a 400 error. `serializer.errors` gives us a dictionary of all the errors that occurred based on the validation rules of the serializer. It's a good idea to return this, so that whoever faces the error has some idea of what went wrong. The second argument is the 400 bad request. By default, the `Response` object returns a 200, but, since we are facing an error, we'll send the 400 bad request error as the second argument.
+
+We can send now send a `POST` request from `127.0.0.1:8000/api/hello-view`.
+
+### Adding PUT, PATCH, and DELETE Methods in our APIView
+
+We'll add dummy `PUT`, `PATCH`, and `DELETE` methods in our API:
+
+```
+def put(self, request, pk=None):
+    """Handle updating an object"""
+    return Response({'method': 'PUT'})
+
+def put(self, request, pk=None):
+    """Handle a partial update of an object"""
+    return Response({'method': 'PATCH'})
+
+def delete(self, request, pk=None):
+    """Handle deleting an object"""
+    return Response({'method': 'DELETE'})
+```
+
+All of these require a `pk` parameter since we must know which instance we are updating/deleting. Usually, the `pk` is the `id` of the object we want to manipulate.
+
+All of these HTTP methods are now also available on `127.0.0.1:8000/api/hello-view`
