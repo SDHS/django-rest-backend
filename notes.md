@@ -974,3 +974,18 @@ class UserProfileViewSet(viewsets.ModelViewSet):
 DRF supports one or more types of authentications. So, that's why, `authentication_classes` holds a tuple in case we need to add more. Same with `permissions_classes`. `authentication_classes` basically defines the mechanism through which authentication is done. `permissions_classes` defines the functions that a user has the permission to do.
 
 Now, a user can only edit his/her own profile, and not other's.
+
+### Adding Profile Search feature (By name/email)
+
+Adding the functionality to filter items in a `ViewSet` is fairly straight-forward. Go to the `views.py` file in `profiles_api` and import the `filters` module:
+
+`from rest_framework import filters`
+
+After this, we simply need to configure our `UserProfileViewSet` to incorporate searching by adding the following two fields:
+
+```
+filter_backends = (filters.SearchFilter,)
+search_fields = ('name', 'email',)
+```
+
+Now, our users are searchable by name and email. A filters option is now available on our API because of the `filter_backends = (filters.SearchFilter,)` line. The filters option simply adds a `search` query param in the URL and sets it equal to whatever we have typed in the search box.
