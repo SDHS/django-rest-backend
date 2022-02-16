@@ -762,3 +762,215 @@ For example,
 `127.0.0.1:8000/api/hello-viewset/1`
 
 Above URL gives us access to the methods that require a `pk`.
+
+### Creating a Profile API
+
+Following is an overview of our profile API:
+
+URL: `/api/profile`
+
+- GET: Lists all profiles
+- POST: Creates new profile
+
+URL: `/api/profile/<profile_id>`
+
+- GET: Returns a specific profile
+- PUT/PATCH: Update a specific profile
+- DELETE: Remove a specific profile
+
+### Creating a User Profile Serializer
+
+Go to the `serializers.py` file we created in `profiles_api` app folder. Now, we're going to add a model serializer. It is very similar to a regular serializer except it has a bunch of extra functionality which makes it easy to work with existing Django database models. To create our model serializer, we first need to import our models:
+
+`from profiles_api import models`
+
+Next, we're going to create our `UserProfileSerializer` class and inherit from `serializers.ModelSerializer`:
+
+```
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializers a user profile object"""
+```
+
+Next, we are going to define a `Meta` class. The way we work with model serializers is we use a `Meta` class to configure the serializer to point to a specific model in our project. In this class, we define a new variable called `model`, and set it to our `UserProfile` model. Next thing we need to do is to specify a list of fields in our model that we want to manager through our serializer. So, this is a list of all the fields that we want to make accessible in our API or the fields we want to use to create new model objects with our serializer. In case of the field `password`, we also need to specify that it should be write-only. This is because when retrieving a user, we do not want the password to be retrieved as well. Although the password is hashed, but still, there are a lot of security risks attached. Secondly, we also want to specify the `style` property. This is so, when we're writing the password, it shows up as `*` instead of text:
+
+```
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializers a user profile object"""
+
+    class Meta:
+        model = models.UserProfile
+        fields = ('id', 'email', 'name', 'password')
+        extra_kwargs = {
+            'password': {
+                'write_only': True,
+                'style': {
+                    'input_type': 'password'
+                }
+            }
+        }
+```
+
+We also now want to override the `create` function. By default, the model serializer allows the creation of simple objects in the database. So, it uses the default `create` function of the object manager to create the object we want. We want to override the functionality for this particular serializer so that it uses the `create_user` function instead of the `create` function. The reason we do this is so that the password gets created as a hash and not as plaintext, the way it would do if the function wasn't overriden.
+
+So, whenever we create a new object with our `UserProfileSerializer`, it will first validate the fields/object provided to the serializer and then it will call the create function passing in the validated data.
+
+Our `UserProfileSerializer` now looks something like:
+
+```
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializers a user profile object"""
+
+    class Meta:
+        model = models.UserProfile
+        fields = ('id', 'email', 'name', 'password')
+        extra_kwargs = {
+            'password': {
+                'write_only': True,
+                'style': {
+                    'input_type': 'password'
+                }
+            }
+        }
+
+    def create(self, validated_data):
+        """Create and return a new user"""
+        user = models.UserProfile.objects.create_user(
+            email=validated_data['email'],
+            name=validated_data['name'],
+            password=validated_data['password'],
+        )
+
+        return user
+
+    def update(self, instance, validated_data):
+        """Handle updating user account"""
+        if 'password' in validated_data:
+            password = validated_data.pop('password')
+            instance.set_password(password)
+
+        return super().update(instance, validated_data)
+```
+
+#### NOTE:
+
+###### Issue
+
+If a user updates their profile, the password field is stored in cleartext, and they are unable to login.
+
+###### Cause
+
+This is because we need to override the default behaviour of Django REST Frameworks ModelSerializer to hash the users password when updating.
+
+###### Fix
+
+To fix the issue, add the below method to the `UserProfileSerializer`
+
+```
+def update(self, instance, validated_data):
+    """Handle updating user account"""
+    if 'password' in validated_data:
+        password = validated_data.pop('password')
+        instance.set_password(password)
+
+    return super().update(instance, validated_data)
+```
+
+###### Explanation
+
+The default update logic for the Django REST Framework (DRF) `ModelSerializer` code will take whatever fields are provided (in our case: `email`, `name`, `password`) and pass them directly to the model.
+
+This is fine for the email and name fields, however the password field requires some additional logic to hash the password before saving the update.
+
+Therefore, we override the Django REST Framework's `update()` method to add this logic to check for the presence password in the validated_data which is passed from DRF when updating an object.
+
+If the field exists, we will "pop" (which means assign the value and remove from the dictionary) the password from the validated data and set it using `set_password()` (which saves the password as a hash).
+
+Once that's done, we use `super().update()` to pass the values to the existing DRF `update()` method, to handle updating the remaining fields.
+
+### Creating Profiles `ViewSet`
+
+With our serializer done, we can now create a `ViewSet` to access the serializer through an endpoint. Go to the `views.py` file in `profiles_api` app folder and import the models:
+
+`from profiles_api import models`
+
+We're going to use a `ModelViewSet`. It is very similar to a standard `ViewSet` except it's specifically designed for managing models through our API. Because of that, it has a lot of functionality for managing models built into it.
+
+```
+class UserProfileViewSet(viewsets.ModelViewSet):
+    """Handles creating and updating profiles"""
+```
+
+The way we use a `ModelViewSet` is that we connect it up to a `serializer_class` just we would a regular `ViewSet`, and we provide a `queryset` to the `ModelViewSet` so it knows which objects in the database are going to be managed through this `ViewSet`.
+
+```
+class UserProfileViewSet(viewsets.ModelViewSet):
+    """Handles creating and updating profiles"""
+
+    serializer_class = serializers.UserProfileSerializer
+    queryset = models.UserProfile.objects.all()
+```
+
+DRF knows the standard functions that we would want to perform on a `ModelViewSet` (`create`, `update`, `partial_update`, `list`, `destroy`). DRF takes care of all of this for us, all we had to do was assign the `serializer_class` to a `ModelSerializer`, and assign the `queryset` to the view sets we want to manage through this.
+
+### Registering Profile `ViewSet` with a URL
+
+Go to the `urls.py` file in `profiles_api` app folder, and register the `ViewSet` as:
+
+`router.register('profile', views.UserProfileViewSet)`
+
+Previously, we had also specified a `base_name` `kwarg` whilst registering our `hello-view` `ViewSet`. That is not needed in this particular class because our `UserProfileViewSet` has a `queryset` object. If we provide the `queryset`, then DRF can figure out the name from the model that's assigned to the `ViewSet`. `base_name` is only needed if our `ViewSet` doesn't have a `queryset` or if we want to override the name that is automatically chosen by DRF from the model.
+
+Our view is now registered on `127.0.0.1:8000/api/profile`.
+
+### Creating a `Permissions` class
+
+Right now, our `Profile` API is accessible to anyone, so anyone is free to make changes. We want to authenticate the users that have the privileges to make these changes before we let them access the API, and restrict the users to only making changes to their own profile. For this functionality, we need a Django permissions class. Create a `permissions.py` file in `profiles_api` folder. Import `permissions` from DRF. It is going to allow us to create our own permissions class:
+
+```
+from rest_framework import permissions
+
+
+class UpdateOwnProfile(permissions.BasePermission):
+    """Allow users to edit their own profile"""
+```
+
+The way we define permission classes is that we add a `has_object_permission` function to the class which gets called everytime a request is made to the API that we assign our permission to. This function will return `True` or `False` to determine whether the user has the permission to do the change they're trying to do. Everytime a request is made, the DRF will pass in the request object, the view, and the actual object that we're checking the permissions against. So, when we try and update a user profile, this gets called. First, we need to check if the request is being made through a safe HTTP method. A safe HTTP method is one that does not update the data, so GET is a safe HTTP method. POST is another one. If a user is trying to view another user's profile, that is permitted, and we should allow the user to do so. If, however, the HTTP method is not a safe one, then we need to check if they're modifying their own profile, since that is also allowed. We can do this by checking if the object they're updating matches their authenticated user profile that is added to the authentication of the request. So, when you authenticate a request, DRF will assign the authenticated user profile to the request and we can use this to compare it to the object that's being updated and make sure they have the same ID. Our class now looks like:
+
+```
+class UpdateOwnProfile(permissions.BasePermission):
+    """Allow users to edit their own profile"""
+
+    def has_object_permission(self, request, view, obj):
+        """Check if a user is trying to edit their own profile"""
+
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        return obj.id == request.user.id
+```
+
+### Adding Authentication and Permissions to our `ViewSet`
+
+Now we need to configure our `UserProfileViewSet` to use the permissions class we recently created. Go to `views.py` in `profiles_api` app folder and add the following import for authenticating users:
+
+`from rest_framework.authentication import TokenAuthentication`
+
+`TokenAuthentication` works by generating a random token string when the user logs in and then to every request we make to the API that we need to authenticate, we add this token string to the request. It is effectively a password to check that every request made is authenticated correctly. We also need to import our `permissions` module:
+
+`from profiles_api import permissions`
+
+Finally, after our imports, we need to configure the authentication in our `UserProfileViewSet`:
+
+```
+class UserProfileViewSet(viewsets.ModelViewSet):
+    """Handles creating and updating profiles"""
+
+    serializer_class = serializers.UserProfileSerializer
+    queryset = models.UserProfile.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (permissions.UpdateOwnProfile,)
+```
+
+DRF supports one or more types of authentications. So, that's why, `authentication_classes` holds a tuple in case we need to add more. Same with `permissions_classes`. `authentication_classes` basically defines the mechanism through which authentication is done. `permissions_classes` defines the functions that a user has the permission to do.
+
+Now, a user can only edit his/her own profile, and not other's.
