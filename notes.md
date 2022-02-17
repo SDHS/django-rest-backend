@@ -989,3 +989,41 @@ search_fields = ('name', 'email',)
 ```
 
 Now, our users are searchable by name and email. A filters option is now available on our API because of the `filter_backends = (filters.SearchFilter,)` line. The filters option simply adds a `search` query param in the URL and sets it equal to whatever we have typed in the search box.
+
+### Creating login API `ViewSet`
+
+We need to add a API endpoint that allows us to generate an authorization token. For this, go to the `views.py` file in `profiles_api` folder, and add the following imports:
+
+```
+from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.settings import api_settings
+```
+
+After the imports, we'll define our class as:
+
+```
+class UserLoginApiView(ObtainAuthToken):
+    """Handle creating user authentication tokens"""
+    renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
+```
+
+`ObtainAuthToken` class provided by the DRF is really handy and we could directly add it to a URL in the `urls.py` file. However, by default, it doesn't enable itself in the browsable Django admin site. So, we need to override this class and customize it so that it's visible in the browsable API. To do this, we need to add the class variable `renderer_classes` to our `UserLoginApiView`. For this, we need the second import so that we can add assign `api_settings.DEFAULT_RENDERER_CLASSES` to our `renderer_classes` variable. This variable enables the django admin for our `APIView`. The other `ViewSet`s and `APIView`s have this enabled by default, that's why we can view them in the Django admin site.
+
+Now, we need to assign a URL to our above `APIView`. For that, go to `urls.py` in the `profiles_api` app folder, and simply add the following entry in `urlpatterns`, inbetween the existing ones:
+
+```
+path('login/', views.UserLoginApiView.as_view()),
+```
+
+Our login endpoint is now enabled. It will show the fields as `username` and `password`. But, since, we have customized the default django behaviour to use `email`, we'll enter `email` in the `username` field. We'll receive a token in the response object if we login with valid credentials.
+
+### Set Token Header Using Mod Header Extension
+
+As we know, we received a token string when we logged in correctly. The way the token authentication works is that every single request that is made to the API has a HTTP header. What we do is add the token to the header, more specifically the authorization header for the requests that we wish to authenticate. So, when we make a request like a GET, PATCH, POST etc, we can provide a key in the header called authorization, and pass the value of the token as the value of the key. When DRF receives the request, it can check if this token exists in the database, and retrieve the appropriate user for this token. We'll set the authorization field in the header using the `ModHeader` extension.
+
+Copy the string received as a response after logging in correctly, and in the `Name` input field in `ModHeader`, write `Authorization`, and in the
+`Value` field, write `Token <token-string>`. Make sure you have the field checked in `ModHeader`. If for some reason you don't want to be authorized whilst sending a request, for testing purposes perhaps, simply uncheck the field.
+
+NOTE: `ModHeader` is just for testing purposes. In reality, we pass the token through client-side, like `fetch` in JavaScript, `requests` in python etc.
+
+You are now authenticated. You'll be able to have access to unsafe HTTP methods on the profile on `api/profile/<profile-id>` through which you logged in, but not on other profiles.
